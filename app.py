@@ -1,7 +1,6 @@
 import streamlit as st
 import pytesseract
 import re
-import numpy as np
 from PIL import Image
  
 st.set_page_config(page_title="🛡️ Скенер за съставки", layout="centered")
@@ -50,6 +49,18 @@ def process_text_and_find_ingredients(raw_text):
  
 st.title("🛡️ Професионален скенер за етикети")
  
+# Check tesseract is available before anything else
+try:
+    pytesseract.get_tesseract_version()
+except pytesseract.TesseractNotFoundError:
+    st.error(
+        "❌ Tesseract не е инсталиран на сървъра.\n\n"
+        "Моля, добавете файл `packages.txt` в корена на GitHub репото си със съдържание:\n\n"
+        "```\ntesseract-ocr\ntesseract-ocr-bul\ntesseract-ocr-eng\n```\n\n"
+        "След това направете redeploy на приложението."
+    )
+    st.stop()
+ 
 uploaded_file = st.file_uploader("Качете снимка на етикета...", type=["jpg", "jpeg", "png"])
  
 if uploaded_file is not None:
@@ -57,7 +68,12 @@ if uploaded_file is not None:
     st.image(image, use_container_width=True)
  
     with st.spinner('Анализирам всяка дума...'):
-        raw_text = pytesseract.image_to_string(image, lang='bul+eng')
+        try:
+            raw_text = pytesseract.image_to_string(image, lang='bul+eng')
+        except pytesseract.TesseractError:
+            # Fall back to English only if Bulgarian language pack is missing
+            raw_text = pytesseract.image_to_string(image, lang='eng')
+ 
         found, debug_text = process_text_and_find_ingredients(raw_text)
  
         with st.expander("Виж разпознатия текст (пречистен)"):
