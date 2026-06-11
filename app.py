@@ -1,5 +1,11 @@
+import streamlit as st
+import easyocr
+import re
+import numpy as np
+from PIL import Image
+ 
 st.set_page_config(page_title="🛡️ Скенер за съставки", layout="centered")
-
+ 
 # База данни с нормализирани ключове (на Кирилица и Латиница за Е-номерата)
 INGREDIENT_DATABASE = {
     "E120": "Кармин/Кошенил - силен алерген от насекоми.",
@@ -12,13 +18,13 @@ INGREDIENT_DATABASE = {
     "ЗАХАР": "Внимание: Съдържа захар.",
     "ГЛУТАМАТ": "Мононатриев глутамат - овкусител.",
 }
-
+ 
 @st.cache_resource
 def load_ocr():
     return easyocr.Reader(['bg', 'en'], gpu=False)
-
+ 
 reader = load_ocr()
-
+ 
 def normalize_to_cyrillic(text):
     """ Превръща латински букви, които приличат на кирилски, в кирилски """
     caps = {
@@ -28,7 +34,7 @@ def normalize_to_cyrillic(text):
     for lat, cyr in caps.items():
         text = text.replace(lat, cyr)
     return text
-
+ 
 def process_text_and_find_ingredients(text_list):
     # 1. Обединяваме и правим всичко в ГЛАВНИ букви
     raw_text = " ".join(text_list).upper()
@@ -37,14 +43,13 @@ def process_text_and_find_ingredients(text_list):
     text_for_e = raw_text.replace("Е", "E").replace("€", "E").replace("I", "1").replace("O", "0")
    
     # 3. Подготовка за думи (Кирилица)
-    # Нормализираме текста, за да хванем смесени букви (напр. МАЛТOдекстрин с латинско O)
     text_for_words = normalize_to_cyrillic(raw_text)
    
     # Махаме интервалите, за да хванем "МАЛТО ДЕКСТРИН"
     text_no_spaces = text_for_words.replace(" ", "")
-
+ 
     found_results = {}
-
+ 
     # --- Търсене на Е-номера (Regex) ---
     e_pattern = re.compile(r'E\s*(\d+)([A-ZА-Я]?)')
     e_matches = e_pattern.findall(text_for_e)
@@ -52,20 +57,20 @@ def process_text_and_find_ingredients(text_list):
         code = "E" + match[0] + match[1]
         if code in INGREDIENT_DATABASE:
             found_results[code] = INGREDIENT_DATABASE[code]
-
+ 
     # --- Търсене на думи (Кирилица) ---
     for key, desc in INGREDIENT_DATABASE.items():
         if not key.startswith("E"):
             if key in text_for_words or key in text_no_spaces:
                 found_results[key] = desc
-
+ 
     return found_results, text_for_words
-
+ 
 # --- Интерфейс ---
 st.title("🛡️ Професионален скенер за етикети")
-
+ 
 uploaded_file = st.file_uploader("Качете снимка на етикета...", type=["jpg", "jpeg", "png"])
-
+ 
 if uploaded_file is not None:
     image = Image.open(uploaded_file)
     st.image(image, use_container_width=True)
@@ -75,12 +80,12 @@ if uploaded_file is not None:
         results = reader.readtext(img_array, detail=0)
        
         found, debug_text = process_text_and_find_ingredients(results)
-
+ 
         with st.expander("Виж разпознатия текст (пречистен)"):
             st.write(debug_text)
-
+ 
         st.divider()
-
+ 
         if found:
             st.warning("⚠️ Открити съставки:")
             for item, desc in found.items():
