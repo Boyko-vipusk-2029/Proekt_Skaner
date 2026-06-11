@@ -1,5 +1,4 @@
 import streamlit as st
-import pytesseract
 import re
 import numpy as np
 from PIL import Image
